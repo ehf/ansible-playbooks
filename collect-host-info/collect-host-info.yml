@@ -1,0 +1,38 @@
+---
+
+# ansible-playbook -i $HOME/list/inventory-1.txt collect-host-info.yml --key-file=$HOME/.ssh/key.1.priv -f 100
+
+- hosts: nodes
+  gather_facts: True
+  vars:
+    ansible_user: 'user1'
+    rootdir: './out'
+    finaloutdir: './final-output'
+    output_file: "{{ finaloutdir }}/collect-host-output.{{ timestamp }}.csv.txt"
+  tasks:
+    - name: "set timestamp"
+      set_fact: timestamp="{{ lookup('pipe', 'date +%Y%m%d.%H%M%S') }}"
+      run_once: true
+
+    - name: "create output directories"
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: 0755
+      loop:
+        - "{{ rootdir }}"
+        - "{{ finaloutdir }}"
+      run_once: true
+      connection: local
+
+    - name: "save output via template"
+      template:
+        src: collect-host-template.j2
+        dest: "{{ rootdir }}/collect-host-output.{{ ansible_hostname }}.csv.txt"
+      connection: local
+
+    - name: "merge collected info one file"
+      assemble:
+        src: "{{ rootdir }}"
+        dest: "{{ output_file }}"
+      connection: local
