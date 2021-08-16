@@ -1,0 +1,135 @@
+---
+
+# install openjdk and remove all other jdk: 
+# ansible-playbook -i inventory.txt install-openjdk.yml --extra-vars "open_jdk_is_enabled=True remove_old_jdk=True remove_previous_jdk=True" -u $USER -k -K --become  --limit=nodes
+#
+# install openjdk and do not update /usr/java/latest link and do not remove all other jdk: 
+# ansible-playbook -i inventory.txt install-openjdk.yml -u $USER -k -K --become --limit=nodes
+# 
+
+
+
+- hosts: nodes
+  gather_facts: no
+  vars:
+    yum_repo_host: repo.vip.408.systems
+    open_jdk_latest: 1.8.0
+    remove_old_jdk: False
+    remove_previous_jdk: False
+    open_jdk_is_enabled: False
+    old_jdk:
+      - jce-jdk1.7.0_79
+      - jce-jdk1.8.0_73
+    previous_jdk:
+      - jce-jdk1.8.0_144
+    open_jdk_pkgs:
+      - java-{{ open_jdk_latest }}-openjdk
+      - java-{{ open_jdk_latest }}-openjdk-headless
+      - java-{{ open_jdk_latest }}-openjdk-devel
+  tasks:
+    - name: "yum clean all"
+      command: yum clean all
+      tags:
+        - install-open-jdk
+        - install-open-jdk-rpm-only
+
+    - name: "install openjdk rpm"
+      yum:
+        name: "{{ open_jdk_pkgs }}"
+        state: latest
+        update_cache: yes
+      tags:
+        - install-open-jdk
+        - install-open-jdk-rpm-only
+
+    - name: "stat jdk"
+      stat: path=/usr/lib/jvm/java-{{ open_jdk_latest }}/bin/java
+      register: openjdkbin
+      tags:
+        - install-open-jdk
+        - update-jdk-link
+
+    - name: "stat jce java security config"
+      stat: path=/usr/lib/jvm/java-{{ open_jdk_latest }}/jre/lib/security/java.security
+      register: openjceconf
+      tags:
+        - install-open-jdk
+        - update-jdk-link
+        - install-open-jdk-rpm-only
+        - update-jce-config
+
+    - name: "ensure unlimited crypto.policy is enabled"
+      lineinfile:
+        path: /usr/lib/jvm/java-{{ open_jdk_latest }}/jre/lib/security/java.security
+        regexp: '^crypto.policy='
+        line: 'crypto.policy=unlimited'
+        state: present
+        owner: root
+        group: root
+        mode: 0644
+        backup: yes
+      when:
+        - openjceconf.stat.exists | bool
+        - openjceconf.stat.isreg | bool
+      tags:
+        - install-open-jdk
+        - update-jdk-link
+        - update-jce-config
+
+    - name: "create /usr/java directory"
+      file:
+        path: /usr/java
+        owner: root
+        group: root
+        mode: 0755
+        state: directory
+      tags:
+        - install-open-jdk
+        - update-jdk-link
+
+    - name: "update /usr/java/latest link"
+      file:
+        src: /usr/lib/jvm/java-{{ open_jdk_latest }}
+        dest: /usr/java/latest
+        owner: root
+        group: root
+        state: link
+      when:
+        - open_jdk_is_enabled | bool
+        - openjdkbin.stat.exists | bool
+        - openjdkbin.stat.isreg | bool
+      tags:
+        - install-open-jdk
+        - update-jdk-link
+
+    - name: "update java alternatives link"
+      alternatives:
+        name: java
+        path: /usr/lib/jvm/java-{{ open_jdk_latest }}/bin/java
+        link: /usr/bin/java
+      when:
+        - open_jdk_is_enabled | bool
+        - openjdkbin.stat.exists | bool
+        - openjdkbin.stat.isreg | bool
+      tags:
+        - install-open-jdk
+        - update-jdk-link
+
+    - name: "remove old jdk"
+      yum:
+        name: "{{ old_jdk }}"
+        state: absent
+      when:
+        - remove_old_jdk | bool
+      tags:
+        - remove-old-jdk
+
+    - name: "remove previously used jdk"
+      yum:
+        name: "{{ previous_jdk }}"
+        state: absent
+      when:
+        - remove_previous_jdk | bool
+      tags:
+        - remove-previous-jdk
+
