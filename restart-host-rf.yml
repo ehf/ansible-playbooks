@@ -1,0 +1,66 @@
+---
+
+# ansible-playbook -i inventory.txt restart-host-rf.yml -k --extra-vars @/home/$USER/.am.vault.yml --extra-vars con_domain=con.408.systems
+
+- hosts: nodes
+  gather_facts: no
+  max_fail_percentage: 49
+  serial: "{{ serial_limit }}"
+  vars:
+    bmc_user: console
+    timeout_check: 1200
+    timeout_delay: 30
+    pause_seconds: 30
+    serial_limit: 1
+  handlers:
+    - name: pause in between
+      pause: seconds={{ pause_seconds }}
+  tasks:
+    - name: "graceful restart from bmc"
+      uri:
+        url: https://{{ inventory_hostname_short }}.{{ con_domain }}/redfish/v1/Systems/1/Actions/ComputerSystem.Reset
+        force_basic_auth: yes
+        body_format: json
+        body: '{ "ResetType": "GracefulRestart" }'
+        user: "{{ bmc_user }}"
+        password: "{{ bmc_password }}"
+        method: POST
+        status_code: 200,202,204
+        return_content: yes
+        validate_certs: no
+      connection: local
+      tags:
+        - restart-via-bmc
+
+
+    - name: "Waiting for host to come back online"
+      local_action: wait_for host={{ inventory_hostname }} port={{ ansible_ssh_port | default(22) }} state=started delay={{ timeout_delay }} timeout={{ timeout_check }}
+      become: no
+      tags:
+        - restart-via-bmc
+
+    - name: "check kernel"
+      shell: uname -r
+      register: checkkernel
+      tags:
+        - restart-via-bmc
+
+    - name: "output kernel"
+      debug: msg={{ checkkernel.stdout_lines }}
+      tags:
+        - restart-via-bmc
+
+    - name: "check uptime"
+      shell: uptime
+      register: checkuptime
+      tags:
+        - restart-via-bmc
+
+    - name: "output uptime"
+      debug: msg={{ checkuptime.stdout_lines }}
+      tags:
+        - restart-via-bmc
+
+    - name: "pause in between"
+      pause: seconds={{ pause_seconds }}
+

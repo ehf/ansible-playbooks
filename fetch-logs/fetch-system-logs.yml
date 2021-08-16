@@ -1,0 +1,57 @@
+---
+
+# ansible-playbook -i inventory.txt fetch-system-logs.yml -u $USER -k -K --become -f 20
+
+- hosts: nodes
+  gather_facts: no
+  vars:
+    collect_logs_base: ./collect-logs
+    collect_logs_dir: ./{{ collect_logs_base }}/{{ inventory_hostname }}
+  tasks:
+    - name: "create dir for collecting logs"
+      file:
+        path: "{{ collect_logs_dir }}"
+        mode: 0755
+        state: directory
+      connection: local
+      become: no
+      tags:
+        - create-collection-dir
+        - fetch-logs
+
+    - name: "find log files"
+      find:
+        path: /var/log
+        recurse: no
+        patterns: "messages*|dmesg*"
+        use_regex: True
+      register: all_messages_logs
+      tags:
+        - find-logs
+        - fetch-logs
+
+#    - debug: msg={{ all_messages_logs}}
+
+    - name: "fetch host system logs"
+      fetch:
+        src: "{{ item.path }}"
+        dest: "{{ collect_logs_dir }}/"
+        flat: yes
+        validate_checksum: no
+      with_items: "{{ all_messages_logs.files }}"
+      tags:
+        - fetch-logs
+
+    - name: "archive logs"
+      archive:
+        path: "{{ collect_logs_base }}"
+        dest: "{{ collect_logs_base }}.tar.gz"
+        format: gz
+        force_archive: True
+      connection: local
+      become: no
+      run_once: True
+      tags:
+        - tar-and-compress-logs
+
+

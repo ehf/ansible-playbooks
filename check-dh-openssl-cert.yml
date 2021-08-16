@@ -1,0 +1,25 @@
+---
+
+- hosts: all
+  vars:
+    dockerhub_endpoint: 'dh.408.systems'
+    dockerhub_endpoint_port: '443'
+  tasks:
+    - name: "connect to {{ dockerhub_endpoint }}:{{ dockerhub_endpoint_port }}"
+      get_certificate:
+        host: "{{ dockerhub_endpoint }}"
+        port: "{{ dockerhub_endpoint_port }}"
+      connection: local
+      register: dh_cert
+      ignore_errors: true
+
+    - name: "output failure message if unable to connect to {{ dockerhub_endpoint }}:{{ dockerhub_endpoint_port }}"
+      debug: msg="{{ dh_cert.msg }}"
+      when: dh_cert is failed
+
+    - name: "output cert status if able to connect to {{ dockerhub_endpoint }}:{{ dockerhub_endpoint_port }}"
+      debug: msg="{{ dh_cert.subject.CN }} cert expiration is {{ dh_cert.expired | bool }}. cert expires in {{ expire_days }} days."
+      vars:
+        expire_days: "{{ (( dh_cert.not_after | to_datetime('%Y%m%d%H%M%SZ')) - (ansible_date_time.iso8601 | to_datetime('%Y-%m-%dT%H:%M:%SZ')) ).days }}"
+      when: dh_cert is not failed
+

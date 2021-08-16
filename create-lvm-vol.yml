@@ -1,0 +1,57 @@
+---
+
+# ansible-playbook -i "localhost," create-lvm-vol.yml -vv -c local
+
+
+- hosts: all
+  connection: local
+  gather_facts: no
+  vars:
+    pvdrives: [ '/dev/sdc1', '/dev/sdd1', '/dev/sde1', '/dev/sdf1', '/dev/sdg1', '/dev/sdh1', '/dev/sdi1', '/dev/sdj1', '/dev/sdk1', '/dev/sdl1', '/dev/sdm1', '/dev/sdn1' ]
+    lvmvg: dmrvg
+    lvmlv: lvol0
+    lvmpe: 4M
+    lvmstripe: 64k
+  tasks:
+    - name: "delete volume group"
+      lvg:
+        vg: "{{ lvmvg }}"
+        state: absent
+        force: yes
+
+    - name: "create volume group"
+      lvg:
+        vg: "{{ lvmvg }}"
+        pvs: "{{ pvdrives }}"
+        pesize: "{{ lvmpe }}"
+
+    - name: "create logical volume"
+      lvol:
+        vg: "{{ lvmvg }}"
+        size: +100%FREE
+        lv: "{{ lvmlv }}"
+        opts: '--type raid10 -m 1 -i 6 -I {{ lvmstripe }}'
+
+    - name: "create xfs filesystem"
+      filesystem:
+        fstype: xfs
+        dev: /dev/{{ lvmvg }}/{{ lvmlv }}
+        opts: '-L /dmr01'
+        force: yes
+
+    - name: "create mount point"
+      file:
+        path: /dmr01
+        owner: root
+        group: root
+        mode: 0755
+        state: directory
+
+    - name: "mount lvm volume"
+      mount:
+        src: LABEL=/dmr01
+        path: /dmr01
+        fstype: xfs
+        opts: 'defaults,noatime,nodiratime,attr2,nobarrier,inode64,nofail'
+        state: mounted
+

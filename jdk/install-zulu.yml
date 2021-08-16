@@ -1,0 +1,100 @@
+---
+
+- hosts: nodes
+  gather_facts: no
+  vars:
+    yum_repo_host: repo.vip.408.systems
+    zulu_jdk_latest: zulu-8
+    zulu_jdk_is_enabled: False
+  tasks:
+    - name: "create azul zulu repo"
+      yum_repository:
+        name: azul-zulu
+        description: azul-zulu-x86_64
+        file: zulu
+        baseurl: http://{{ yum_repo_host }}/repo/azul/zulu/releases/linux/$basearch
+        enabled: yes
+        gpgcheck: no
+      tags:
+        - deploy-zulu-jdk-repo
+        - install-zulu-jdk
+        - install-zulu-jdk-rpm-only
+
+    - name: "yum clean all"
+      command: yum clean all
+      tags:
+        - install-zulu-jdk
+        - install-zulu-jdk-rpm-only
+
+    - name: "install zulu rpm"
+      yum:
+        name: "{{ zulu_jdk_latest }}"
+        state: installed
+        update_cache: yes
+      tags:
+        - deploy-zulu-jdk-repo
+        - install-zulu-jdk
+        - install-zulu-jdk-rpm-only
+
+    - name: "stat jdk install path"
+      stat: path=/usr/lib/jvm/{{ zulu_jdk_latest }}
+      register: zulujdkdir
+      tags:
+        - install-zulu-jdk
+        - update-jdk-link
+
+    - name: "stat jce install path"
+      stat: path=/usr/lib/jvm/{{ zulu_jdk_latest }}/jre/lib/security
+      register: zulujcedir
+      tags:
+        - install-zulu-jdk
+        - install-zulu-jce
+        - update-jdk-link
+        - install-zulu-jdk-rpm-only
+
+    - name: "install jce policy jar files"
+      get_url:
+        url: http://{{ yum_repo_host }}/repo/azul/zulu/releases/linux/x86_64/Packages/ZuluJCEPolicies/{{ item }}
+        dest: /usr/lib/jvm/{{ zulu_jdk_latest }}/jre/lib/security/{{ item }}
+        owner: root
+        group: root
+        mode: 0644
+      loop:
+        - local_policy.jar
+        - US_export_policy.jar
+      when:
+        - zulujcedir.stat.exists | bool
+        - zulujcedir.stat.isdir | bool
+      tags:
+        - install-zulu-jce
+        - install-zulu-jdk
+        - install-zulu-jdk-rpm-only
+
+    - name: "set /usr/java/latest link to zulu"
+      file:
+        src: /usr/lib/jvm/{{ zulu_jdk_latest }}
+        dest: /usr/java/latest
+        owner: root
+        group: root
+        state: link
+      when:
+        - zulu_jdk_is_enabled | bool
+        - zulujdkdir.stat.exists | bool
+        - zulujdkdir.stat.isdir | bool
+      tags:
+        - install-zulu-jdk
+        - update-jdk-link
+
+    - name: "update java alternatives link"
+      alternatives:
+        name: java
+        path: /usr/lib/jvm/{{ zulu_jdk_latest }}/bin/java
+        link: /usr/bin/java
+      when:
+        - zulu_jdk_is_enabled | bool
+        - zulujdkdir.stat.exists | bool
+        - zulujdkdir.stat.isdir | bool
+      tags:
+        - install-zulu-jdk
+        - update-jdk-link
+

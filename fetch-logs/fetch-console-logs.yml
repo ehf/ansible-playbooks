@@ -1,0 +1,53 @@
+---
+
+# ansible-playbook -i inventory.txt fetch-console-logs.yml --vault-id <VAULT-ID-FILE> --extra-vars con_domain=con.408.systems --extra-vars @/path/to/<VAULT-VARS-YML-FILE> -f 20 
+#
+# with curl command: 
+#
+# curl -u <USER>:<PASSWORD> -m 10 -k -s https://<CONSOLE>/redfish/v1/Managers/1/LogServices/Log1/Entries | jq .
+#
+
+- hosts: nodes
+  gather_facts: no
+  connection: local
+  vars:
+    bmc_user: console
+    redfish_bmc_logs: '/redfish/v1/Managers/1/LogServices/Log1/Entries'
+    logdir_out: ./bmc-logs
+    datatype: bmc_logs
+    timestamp: "{{ lookup('pipe', 'date +%Y%m%d_%H%M%S') }}"
+    template: "{{ logdir_out }}/{{ inventory_hostname }}/{{ inventory_hostname }}_{{ datatype }}_{{ timestamp }}"
+  tasks:
+    - name: "create directory for storing logs"
+      file:
+        path: "{{ logdir_out }}/{{ inventory_hostname }}"
+        state: directory
+
+#    - name: "pull bmc logs"
+#      redfish_info:
+#        category: Manager
+#        command: GetLogs
+#        baseuri: "{{ inventory_hostname_short }}.{{ con_domain }}"
+#        username: "{{ bmc_user }}"
+#        password: "{{ bmc_password }}"
+#      register: bmcresult
+
+    - name: "pull bmc logs"
+      uri:
+        url: https://{{ inventory_hostname_short }}.{{ con_domain }}/{{ redfish_bmc_logs }}
+        force_basic_auth: yes
+        user: "{{ bmc_user }}"
+        password: "{{ bmc_password }}"
+        method: GET
+        status_code: 200,202,204
+        return_content: yes
+        validate_certs: no
+      register: bmcresult
+      tags:
+        - pull-bmc-logs
+
+    - name: "save results to a file"
+      copy:
+        content: "{{ bmcresult.json | to_nice_json }}"
+        dest: "{{ template }}.json"
+

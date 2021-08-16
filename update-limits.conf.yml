@@ -1,0 +1,28 @@
+---
+
+- hosts: all
+  gather_facts: no
+  tasks:
+  - name: "stat limits.conf file"
+    stat: path=/etc/security/limits.conf
+    register: limitsconf
+    tags:
+      - setup-limits
+
+  - name: "setup limits for general users"
+    pam_limits:
+      dest: "{{ item.conf }}"
+      domain: "{{ item.user }}"
+      limit_type: "{{ item.type }}"
+      limit_item: "{{ item.name }}"
+      value: "{{ item.value }}"
+      backup: yes
+    with_items:
+      - { user: '*', type: 'soft', name: 'nofile', value: '1024000', conf: '/etc/security/limits.conf' }
+      - { user: '*', type: 'hard', name: 'nofile', value: '1024000', conf: '/etc/security/limits.conf' }
+    when:
+      - limitsconf.stat.exists
+      - limitsconf.stat.isreg
+    tags:
+      - setup-limits
+

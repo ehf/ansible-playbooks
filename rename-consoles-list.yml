@@ -1,0 +1,97 @@
+---
+
+# ansible-playbook -i inventory.txt rename-consoles-list.yml --vault-id /home/$USER/.am-vault.id --extra-vars @/home/$USER/.am-vault.yml --limit=dn-6
+
+- hosts: nodes
+  gather_facts: no
+  connection: local
+  vars:
+    bmc_user: 'console'
+    con_domain: 'con.408.systems'
+    moving_to_this_cluster: 'clusternew'
+    baseuri: "{{ inventory_hostname }}"
+    resource_uri: 'redfish/v1/Managers/1/EthernetInterfaces/1'
+    pause_minutes: '4'
+  tasks:
+    - name: "match old hostname to new hostname"
+      shell: awk -F\| '/{{ inventory_hostname }}/ { sub(".l.408.systems", "", $2); print $2 }' renames.{{ moving_to_this_cluster }}
+      register: newcluster_hostname
+      connection: local
+      tags:
+        - print-new-hostname
+        - check-hostname-change
+        - check-hostname-post-change
+        - rename-console
+
+    - debug: msg="{{ inventory_hostname }} console will be renamed to {{ newcluster_hostname.stdout }}.{{ con_domain }}"
+      tags:
+        - print-new-hostname
+        - check-hostname-change
+        - rename-console
+
+    - name: "get console hostname"
+      uri:
+        url: "https://{{ inventory_hostname_short }}.{{ con_domain }}/{{ resource_uri }}"
+        force_basic_auth: yes
+        user: "{{ bmc_user }}"
+        password: "{{ bmc_password }}"
+        method: GET
+        status_code: 200,202,204
+        return_content: yes
+        validate_certs: no
+      register: bmcresult
+      tags:
+        - check-hostname-change
+        - get-console-name
+
+    - debug: msg="{{ inventory_hostname }} console HostName is currently {{ bmcresult.json.HostName }}"
+      tags:
+        - check-hostname-change
+        - get-console-name
+
+    - name: "set new console hostname"
+      uri:
+        url: "https://{{ inventory_hostname_short }}.{{ con_domain }}/{{ resource_uri }}"
+        force_basic_auth: yes
+        user: "{{ bmc_user }}"
+        password: "{{ bmc_password }}"
+        method: PATCH
+        status_code: 200,202,204
+        return_content: yes
+        validate_certs: no
+        body_format: json
+        body: '{ "HostName": "{{ newcluster_hostname.stdout }}" }'
+      register: new_console_name
+      tags:
+        - rename-console
+
+    - name: "pause while console name update takes place via DHCP/Dynamic-DNS"
+      pause:
+        minutes: "{{ pause_minutes }}"
+
+    - debug: msg={{ newcluster_hostname.stdout }}
+      tags:
+        - check-hostname-post-change
+
+    - name: "check console hostname change"
+      uri:
+        url: "https://{{ newcluster_hostname.stdout }}.{{ con_domain }}/{{ resource_uri }}"
+        force_basic_auth: yes
+        user: "{{ bmc_user }}"
+        password: "{{ bmc_password }}"
+        method: GET
+        status_code: 200,202,204
+        return_content: yes
+        validate_certs: no
+      register: get_new_console_name
+      tags:
+        - check-hostname-post-change
+        - rename-console
+
+    - debug: msg="{{ inventory_hostname }} console HostName is now {{ get_new_console_name.json.HostName }}"
+      tags:
+        - print-new-hostname
+        - check-hostname-post-change
+        - rename-console
+
+
