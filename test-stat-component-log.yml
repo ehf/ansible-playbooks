@@ -1,0 +1,28 @@
+--- 
+
+- hosts: all
+  gather_facts: no
+  connection: local
+  tasks:
+    - name: "check for previous ilo install log"
+      stat:
+        path: /var/cpq/Component.log
+      register: ilo_component_log
+
+    - name: "rename previous "
+      shell: "mv /var/cpq/Component.log /var/cpq/Component.log.$(date +%Y%m%d.%H%M%S)"
+      when:
+        - ilo_component_log.stat.exists | bool
+        - ilo_component_log.stat.isreg | bool
+
+    - name: "check for 1.txt log"
+      stat:
+        path: /home/me/1.txt
+      register: text_log
+
+    - name: "rename test text log"
+      shell: "mv /home/me/1.txt /home/me/1.txt.$(date +%Y%m%d.%H%M%S)"
+      when:
+        - text_log.stat.exists | bool
+        - text_log.stat.isreg | bool
+        
