@@ -1,0 +1,22 @@
+--- 
+
+- hosts: all
+  gather_facts: no
+  connection: local
+  tasks:
+    - name: "check for 1.txt log"
+      stat:
+        path: /home/me/1.txt
+      register: text_log
+
+    - name: "read in content of log file"
+      shell: "cat /home/me/1.txt"
+      register: log_out
+      when:
+        - text_log.stat.exists | bool
+        - text_log.stat.isreg | bool
+
+    - name: "output content of log file" 
+      debug:
+        var: "log_out.stdout_lines"
+
