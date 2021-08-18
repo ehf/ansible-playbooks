@@ -1,0 +1,22 @@
+---
+
+- hosts: all
+  gather_facts: no
+  connection: local
+  tasks:
+    - name: "test running of setup script"
+      shell: "echo 'y' | ./setup-test.sh"
+      args:
+        chdir: /home/me
+        executable: /bin/bash
+      register: setup_script_out
+      failed_when: > 
+        ("Succeeded" not in setup_script_out.stdout) or
+        ("reboot completed" not in setup_script_out.stdout) or
+        (setup_script_out.failed | bool)
+      tags:
+        - test-setup-script-output-check
+      
+    - name: "setup_script_out var"
+      debug:
+        var: setup_script_out
