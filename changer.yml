@@ -1,0 +1,11 @@
+---
+
+- hosts: all
+  vars_prompt:
+    - name: new_rootpw
+      prompt: "enter new rpw "
+      private: yes
+  tasks:
+    - name: "change passwd"
+      shell: echo 'root:{{ new_rootpw }}' | /usr/sbin/chpasswd
+      no_log: true
