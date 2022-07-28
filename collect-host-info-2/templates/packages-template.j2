@@ -1,0 +1,3 @@
+{% for key in ansible_facts.packages.keys() | sort %}
+{{ key }}-{{ hostvars[inventory_hostname].ansible_facts.packages[key][0].version }}-{{ hostvars[inventory_hostname].ansible_facts.packages[key][0].release }}
+{% endfor %}
