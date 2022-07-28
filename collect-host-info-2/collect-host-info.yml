@@ -12,7 +12,7 @@
   tasks:
     - name: "set timestamp"
       set_fact: timestamp="{{ lookup('pipe', 'date +%Y%m%d.%H%M%S') }}"
-      run_once: true
+      run_once: True
 
     - name: "create output directories"
       file:
@@ -23,7 +23,7 @@
         - "{{ rootdir }}"
         - "{{ rootdir }}-pkgs"
         - "{{ finaloutdir }}"
-      run_once: true
+      run_once: True
       connection: local
       vars:
         ansible_python_interpreter: /opt/homebrew/bin/python3
