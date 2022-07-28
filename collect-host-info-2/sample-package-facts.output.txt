@@ -1,0 +1,42 @@
+#
+
+        "yum-utils": [
+            {
+                "arch": "noarch",
+                "epoch": null,
+                "name": "yum-utils",
+                "release": "54.el7_8",
+                "source": "rpm",
+                "version": "1.1.31"
+            }
+        ],
+        "zip": [
+            {
+                "arch": "x86_64",
+                "epoch": null,
+                "name": "zip",
+                "release": "11.el7",
+                "source": "rpm",
+                "version": "3.0"
+            }
+        ],
+        "zlib": [
+            {
+                "arch": "x86_64",
+                "epoch": null,
+                "name": "zlib",
+                "release": "20.el7_9",
+                "source": "rpm",
+                "version": "1.2.7"
+            }
+        ],
+        "zsh": [
+            {
+                "arch": "x86_64",
+                "epoch": null,
+                "name": "zsh",
+                "release": "34.el7_8.2",
+                "source": "rpm",
+                "version": "5.0.2"
+            }
+        ]
