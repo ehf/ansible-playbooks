@@ -1,0 +1,58 @@
+---
+
+#  ansible-playbook -i inventory collect-host-info.yml -vv
+
+- hosts: all
+  gather_facts: True
+  become: False
+  vars:
+    rootdir: './collect-it/out'
+    finaloutdir: './collect-it/final-output'
+    output_file: "{{ finaloutdir }}/collect-host-output.{{ timestamp }}.csv.txt"
+  tasks:
+    - name: "set timestamp"
+      set_fact: timestamp="{{ lookup('pipe', 'date +%Y%m%d.%H%M%S') }}"
+      run_once: true
+
+    - name: "create output directories"
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: 0755
+      loop:
+        - "{{ rootdir }}"
+        - "{{ rootdir }}-pkgs"
+        - "{{ finaloutdir }}"
+      run_once: true
+      connection: local
+      vars:
+        ansible_python_interpreter: /opt/homebrew/bin/python3
+
+    - name: "collect package facts"
+      package_facts:
+        manager: auto
+
+    - name: "save package output via template"
+      template:
+        src: templates/packages-template.j2
+        dest: "{{ rootdir }}-pkgs/collect-packages-output.{{ ansible_hostname }}.txt"
+      connection: local
+      vars:
+        ansible_python_interpreter: /opt/homebrew/bin/python3
+
+    - name: "save output via template"
+      template:
+        src: templates/collect-host-template.j2
+        dest: "{{ rootdir }}/collect-host-output.{{ ansible_hostname }}.csv.txt"
+      connection: local
+      vars:
+        ansible_python_interpreter: /opt/homebrew/bin/python3
+
+    - name: "merge collected info into one file"
+      assemble:
+        src: "{{ rootdir }}"
+        dest: "{{ output_file }}"
+      connection: local
+      vars:
+        ansible_python_interpreter: /opt/homebrew/bin/python3
+
