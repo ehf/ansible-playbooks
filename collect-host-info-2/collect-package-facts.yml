@@ -1,5 +1,7 @@
 ---
 
+# ansible-playbook -i inventory collect-package-facts.yml -vv
+
 - hosts: all
   gather_facts: True
   tasks:
